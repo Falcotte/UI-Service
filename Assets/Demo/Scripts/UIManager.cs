@@ -16,5 +16,6 @@ public class UIManager : MonoBehaviour
     private void ShowHomeScreen()
     {
         _uiService.ShowScreenAsync("Home");
+        _uiService.LoadScreenAsync("Settings");
     }
 }

@@ -17,12 +17,138 @@ namespace AngryKoala.UI
 
         private readonly Dictionary<string, ScreenData> _activeScreens = new(StringComparer.Ordinal);
 
+        public async Task<IScreen> LoadScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(screenKey))
+            {
+                throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
+            }
+            
+            if (_activeScreens.TryGetValue(screenKey, out ScreenData existingData))
+            {
+                if (existingData.Instance != null && existingData.Instance.activeSelf)
+                {
+                    existingData.Instance.SetActive(false);
+                }
+
+                return existingData.Screen;
+            }
+
+            if (_screenRegistry == null)
+            {
+                throw new InvalidOperationException("ScreenRegistry is not assigned on UIService.");
+            }
+
+            if (!_screenRegistry.TryGetAddress(screenKey, out string address) || string.IsNullOrWhiteSpace(address))
+            {
+                throw new KeyNotFoundException($"No Addressables address found for screen key {screenKey}.");
+            }
+
+            AsyncOperationHandle<GameObject> instantiateHandle =
+                Addressables.InstantiateAsync(address, _canvas != null ? _canvas.transform : null);
+
+            try
+            {
+                await instantiateHandle.Task;
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    if (instantiateHandle.IsValid())
+                    {
+                        Addressables.ReleaseInstance(instantiateHandle);
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+
+                GameObject instance = instantiateHandle.Result;
+
+                if (instance == null)
+                {
+                    if (instantiateHandle.IsValid())
+                    {
+                        Addressables.ReleaseInstance(instantiateHandle);
+                    }
+
+                    throw new InvalidOperationException(
+                        $"Failed to instantiate screen {screenKey} from address {address}.");
+                }
+                
+                if (instance.activeSelf)
+                {
+                    instance.SetActive(false);
+                }
+
+                IScreen screen = instance.GetComponentInChildren<IScreen>(true);
+
+                if (screen == null)
+                {
+                    if (instantiateHandle.IsValid())
+                    {
+                        Addressables.ReleaseInstance(instantiateHandle);
+                    }
+
+                    throw new InvalidOperationException(
+                        $"Instantiated prefab for {screenKey} does not contain a component implementing IScreen.");
+                }
+
+                screen.Initialize(screenKey);
+
+                ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
+                _activeScreens[screenKey] = screenData;
+
+                return screen;
+            }
+            catch (Exception exception)
+            {
+                if (instantiateHandle.IsValid())
+                {
+                    Addressables.ReleaseInstance(instantiateHandle);
+                }
+
+                Debug.LogException(exception);
+                throw;
+            }
+        }
+
+        public async Task UnloadScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(screenKey))
+            {
+                throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
+            }
+
+            if (!_activeScreens.TryGetValue(screenKey, out ScreenData screenData))
+            {
+                return;
+            }
+            
+            try
+            {
+                if (screenData.Instance != null && screenData.Instance.activeSelf)
+                {
+                    screenData.Instance.SetActive(false);
+                }
+                
+                await Task.Yield();
+            }
+            finally
+            {
+                if (screenData.Handle.IsValid())
+                {
+                    Addressables.ReleaseInstance(screenData.Handle);
+                }
+
+                _activeScreens.Remove(screenKey);
+            }
+        }
+
         public Task<IScreen> ShowScreenAsync(string screenKey, CancellationToken cancellationToken = default)
         {
             return ShowScreenAsync(screenKey, TransitionStyle.Animated, cancellationToken);
         }
 
-        public async Task<IScreen> ShowScreenAsync(string screenKey, TransitionStyle style,
+        public async Task<IScreen> ShowScreenAsync(string screenKey, TransitionStyle transitionStyle,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(screenKey))
@@ -32,7 +158,7 @@ namespace AngryKoala.UI
 
             if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
-                await activeScreenData.Screen.ShowAsync(style, cancellationToken);
+                await activeScreenData.Screen.ShowAsync(transitionStyle, cancellationToken);
                 return activeScreenData.Screen;
             }
 
@@ -94,7 +220,7 @@ namespace AngryKoala.UI
                 ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
                 _activeScreens[screenKey] = screenData;
 
-                await screen.ShowAsync(style, cancellationToken);
+                await screen.ShowAsync(transitionStyle, cancellationToken);
 
                 return screen;
             }
@@ -115,7 +241,7 @@ namespace AngryKoala.UI
             return HideScreenAsync(screenKey, TransitionStyle.Animated, cancellationToken);
         }
 
-        public async Task HideScreenAsync(string screenKey, TransitionStyle style,
+        public async Task HideScreenAsync(string screenKey, TransitionStyle transitionStyle,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(screenKey))
@@ -130,7 +256,7 @@ namespace AngryKoala.UI
 
             try
             {
-                await screenData.Screen.HideAsync(style, cancellationToken);
+                await screenData.Screen.HideAsync(transitionStyle, cancellationToken);
             }
             catch (Exception exception)
             {
