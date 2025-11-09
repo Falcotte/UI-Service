@@ -43,6 +43,6 @@ public sealed class SettingsScreen : BaseScreen
     private async void OnBackClicked()
     {
         await _uiService.HideScreenAsync("Settings");
-        await _uiService.ShowScreenAsync("Home");
+        await _uiService.ShowScreenAsync<HomeScreen>("Home");
     }
 }

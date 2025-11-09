@@ -10,7 +10,7 @@ namespace AngryKoala.UI
         public string ScreenKey { get; private set; }
 
         public bool IsVisible { get; private set; }
-        
+
         public event Action<IScreen> BeforeScreenShow;
         public event Action<IScreen> AfterScreenShow;
         public event Action<IScreen> BeforeScreenHide;
@@ -21,16 +21,17 @@ namespace AngryKoala.UI
             ScreenKey = screenKey;
         }
 
-        public async Task ShowAsync(TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
+        public async Task ShowAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
         {
             try
             {
                 InvokeCallback(BeforeScreenShow);
-                
+
                 gameObject.SetActive(true);
                 IsVisible = true;
 
-                if (transitionStyle == TransitionStyle.Instant)
+                if (screenTransitionStyle == ScreenTransitionStyle.Instant)
                 {
                     OnShowInstant();
                 }
@@ -38,7 +39,7 @@ namespace AngryKoala.UI
                 {
                     await OnShowAsync(cancellationToken);
                 }
-                
+
                 InvokeCallback(AfterScreenShow);
             }
             catch (Exception exception)
@@ -48,13 +49,14 @@ namespace AngryKoala.UI
             }
         }
 
-        public async Task HideAsync(TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
+        public async Task HideAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
         {
             try
             {
                 InvokeCallback(BeforeScreenHide);
-                
-                if (transitionStyle == TransitionStyle.Instant)
+
+                if (screenTransitionStyle == ScreenTransitionStyle.Instant)
                 {
                     OnHideInstant();
                 }
@@ -72,7 +74,7 @@ namespace AngryKoala.UI
             {
                 IsVisible = false;
                 gameObject.SetActive(false);
-                
+
                 InvokeCallback(AfterScreenHide);
             }
         }
@@ -93,7 +95,7 @@ namespace AngryKoala.UI
         {
             return Task.CompletedTask;
         }
-        
+
         protected virtual void OnShowInstant()
         {
         }
@@ -101,7 +103,7 @@ namespace AngryKoala.UI
         protected virtual void OnHideInstant()
         {
         }
-        
+
         private void InvokeCallback(Action<IScreen> action)
         {
             try

@@ -1,6 +1,6 @@
 namespace AngryKoala.UI
 {
-    public enum TransitionStyle
+    public enum ScreenTransitionStyle
     {
         Animated,
         Instant

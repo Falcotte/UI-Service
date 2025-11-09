@@ -11,27 +11,64 @@ namespace AngryKoala.UI
 {
     public sealed class UIService : BaseService<IUIService>, IUIService
     {
-        [SerializeField] private Canvas _canvas;
-
+        [SerializeField] private Canvas _activeCanvas;
+        [SerializeField] private Transform _inactiveRoot;
+        
         [SerializeField] private ScreenRegistry _screenRegistry;
 
         private readonly Dictionary<string, ScreenData> _activeScreens = new(StringComparer.Ordinal);
 
-        public async Task<IScreen> LoadScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        private Transform ActiveRoot => _activeCanvas.transform;
+
+        protected override void Awake()
+        {
+            base.Awake();
+
+            if (_activeCanvas == null)
+            {
+                throw new InvalidOperationException(
+                    "ActiveCanvas reference is not assigned. Assign a Canvas in the inspector.");
+            }
+        }
+
+        public Task<IScreen> LoadScreenAsync(
+            string screenKey,
+            CancellationToken cancellationToken = default)
+        {
+            return LoadScreenAsync<IScreen>(screenKey, cancellationToken);
+        }
+
+        public async Task<TScreen> LoadScreenAsync<TScreen>(string screenKey,
+            CancellationToken cancellationToken = default) where TScreen : class, IScreen
         {
             if (string.IsNullOrWhiteSpace(screenKey))
             {
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
-            
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData existingData))
+
+            if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
-                if (existingData.Instance != null && existingData.Instance.activeSelf)
+                if (activeScreenData.Instance != null && activeScreenData.Instance.activeSelf)
                 {
-                    existingData.Instance.SetActive(false);
+                    activeScreenData.Instance.SetActive(false);
                 }
 
-                return existingData.Screen;
+                if (activeScreenData.Screen is TScreen typedScreen)
+                {
+                    return typedScreen;
+                }
+
+                if (activeScreenData.Instance != null)
+                {
+                    TScreen foundScreen = activeScreenData.Instance.GetComponentInChildren<TScreen>(true);
+                    if (foundScreen != null)
+                    {
+                        return foundScreen;
+                    }
+                }
+
+                throw new InvalidOperationException(
+                    $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
             }
 
             if (_screenRegistry == null)
@@ -45,7 +82,7 @@ namespace AngryKoala.UI
             }
 
             AsyncOperationHandle<GameObject> instantiateHandle =
-                Addressables.InstantiateAsync(address, _canvas != null ? _canvas.transform : null);
+                Addressables.InstantiateAsync(address, _inactiveRoot);
 
             try
             {
@@ -73,7 +110,7 @@ namespace AngryKoala.UI
                     throw new InvalidOperationException(
                         $"Failed to instantiate screen {screenKey} from address {address}.");
                 }
-                
+
                 if (instance.activeSelf)
                 {
                     instance.SetActive(false);
@@ -97,7 +134,19 @@ namespace AngryKoala.UI
                 ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
                 _activeScreens[screenKey] = screenData;
 
-                return screen;
+                if (screen is TScreen typed)
+                {
+                    return typed;
+                }
+
+                TScreen found = instance.GetComponentInChildren<TScreen>(true);
+                if (found != null)
+                {
+                    return found;
+                }
+
+                throw new InvalidOperationException(
+                    $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
             }
             catch (Exception exception)
             {
@@ -122,14 +171,14 @@ namespace AngryKoala.UI
             {
                 return;
             }
-            
+
             try
             {
                 if (screenData.Instance != null && screenData.Instance.activeSelf)
                 {
                     screenData.Instance.SetActive(false);
                 }
-                
+
                 await Task.Yield();
             }
             finally
@@ -142,8 +191,9 @@ namespace AngryKoala.UI
                 _activeScreens.Remove(screenKey);
             }
         }
-        
-        public async Task<TScreen> GetScreenAsync<TScreen>(string screenKey, CancellationToken cancellationToken = default)
+
+        public async Task<TScreen> GetScreenAsync<TScreen>(string screenKey,
+            CancellationToken cancellationToken = default)
             where TScreen : class, IScreen
         {
             if (string.IsNullOrWhiteSpace(screenKey))
@@ -151,24 +201,25 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData data))
+            if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
-                if (data.Screen is TScreen typedScreen)
+                if (activeScreenData.Screen is TScreen typedScreen)
                 {
                     return typedScreen;
                 }
 
-                if (data.Instance != null)
+                if (activeScreenData.Instance != null)
                 {
-                    TScreen found = data.Instance.GetComponentInChildren<TScreen>(true);
-                    
-                    if (found != null)
+                    TScreen foundScreen = activeScreenData.Instance.GetComponentInChildren<TScreen>(true);
+
+                    if (foundScreen != null)
                     {
-                        return found;
+                        return foundScreen;
                     }
                 }
 
-                throw new InvalidOperationException($"Loaded screen '{screenKey}' does not contain a component of type {typeof(TScreen).Name}.");
+                throw new InvalidOperationException(
+                    $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
             }
 
             IScreen baseScreen = await LoadScreenAsync(screenKey, cancellationToken);
@@ -178,26 +229,31 @@ namespace AngryKoala.UI
                 return typed;
             }
 
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData loadedData) && loadedData.Instance != null)
+            if (_activeScreens.TryGetValue(screenKey, out ScreenData screenData) && screenData.Instance != null)
             {
-                TScreen found = loadedData.Instance.GetComponentInChildren<TScreen>(true);
-                
+                TScreen found = screenData.Instance.GetComponentInChildren<TScreen>(true);
+
                 if (found != null)
                 {
                     return found;
                 }
             }
 
-            throw new InvalidOperationException($"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
+            throw new InvalidOperationException(
+                $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
         }
 
-        public Task<IScreen> ShowScreenAsync(string screenKey, CancellationToken cancellationToken = default)
-        {
-            return ShowScreenAsync(screenKey, TransitionStyle.Animated, cancellationToken);
-        }
-
-        public async Task<IScreen> ShowScreenAsync(string screenKey, TransitionStyle transitionStyle,
+        public Task<IScreen> ShowScreenAsync(string screenKey,
+            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
             CancellationToken cancellationToken = default)
+        {
+            return ShowScreenAsync<IScreen>(screenKey, screenTransitionStyle, cancellationToken);
+        }
+
+        public async Task<TScreen> ShowScreenAsync<TScreen>(string screenKey,
+            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
+            where TScreen : class, IScreen
         {
             if (string.IsNullOrWhiteSpace(screenKey))
             {
@@ -206,8 +262,29 @@ namespace AngryKoala.UI
 
             if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
-                await activeScreenData.Screen.ShowAsync(transitionStyle, cancellationToken);
-                return activeScreenData.Screen;
+                if (activeScreenData.Instance != null)
+                {
+                    activeScreenData.Instance.transform.SetParent(ActiveRoot, false);
+                }
+
+                await activeScreenData.Screen.ShowAsync(screenTransitionStyle, cancellationToken);
+
+                if (activeScreenData.Screen is TScreen typedScreen)
+                {
+                    return typedScreen;
+                }
+
+                if (activeScreenData.Instance != null)
+                {
+                    TScreen foundScreen = activeScreenData.Instance.GetComponentInChildren<TScreen>(true);
+                    if (foundScreen != null)
+                    {
+                        return foundScreen;
+                    }
+                }
+
+                throw new InvalidOperationException(
+                    $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
             }
 
             if (_screenRegistry == null)
@@ -221,7 +298,7 @@ namespace AngryKoala.UI
             }
 
             AsyncOperationHandle<GameObject> instantiateHandle =
-                Addressables.InstantiateAsync(address, _canvas != null ? _canvas.transform : null);
+                Addressables.InstantiateAsync(address, _inactiveRoot);
 
             try
             {
@@ -250,9 +327,9 @@ namespace AngryKoala.UI
                         $"Failed to instantiate screen {screenKey} from address {address}.");
                 }
 
-                IScreen screen = instance.GetComponentInChildren<IScreen>(true);
+                IScreen foundScreen = instance.GetComponentInChildren<IScreen>(true);
 
-                if (screen == null)
+                if (foundScreen == null)
                 {
                     if (instantiateHandle.IsValid())
                     {
@@ -263,14 +340,27 @@ namespace AngryKoala.UI
                         $"Instantiated prefab for {screenKey} does not contain a component implementing IScreen.");
                 }
 
-                screen.Initialize(screenKey);
+                foundScreen.Initialize(screenKey);
 
-                ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
+                ScreenData screenData = new ScreenData(screenKey, address, foundScreen, instance, instantiateHandle);
                 _activeScreens[screenKey] = screenData;
 
-                await screen.ShowAsync(transitionStyle, cancellationToken);
+                instance.transform.SetParent(ActiveRoot, false);
+                await foundScreen.ShowAsync(screenTransitionStyle, cancellationToken);
 
-                return screen;
+                if (foundScreen is TScreen typed)
+                {
+                    return typed;
+                }
+
+                TScreen found = instance.GetComponentInChildren<TScreen>(true);
+                if (found != null)
+                {
+                    return found;
+                }
+
+                throw new InvalidOperationException(
+                    $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
             }
             catch (Exception exception)
             {
@@ -284,12 +374,8 @@ namespace AngryKoala.UI
             }
         }
 
-        public Task HideScreenAsync(string screenKey, CancellationToken cancellationToken = default)
-        {
-            return HideScreenAsync(screenKey, TransitionStyle.Animated, cancellationToken);
-        }
-
-        public async Task HideScreenAsync(string screenKey, TransitionStyle transitionStyle,
+        public async Task HideScreenAsync(string screenKey,
+            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(screenKey))
@@ -304,7 +390,7 @@ namespace AngryKoala.UI
 
             try
             {
-                await screenData.Screen.HideAsync(transitionStyle, cancellationToken);
+                await screenData.Screen.HideAsync(screenTransitionStyle, cancellationToken);
             }
             catch (Exception exception)
             {
@@ -326,6 +412,7 @@ namespace AngryKoala.UI
             foreach (KeyValuePair<string, ScreenData> keyValuePair in _activeScreens)
             {
                 ScreenData screenData = keyValuePair.Value;
+
                 try
                 {
                     if (screenData.Handle.IsValid())

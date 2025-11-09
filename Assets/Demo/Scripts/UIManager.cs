@@ -15,9 +15,9 @@ public class UIManager : MonoBehaviour
 
     private async void ShowHomeScreen()
     {
-        _uiService.ShowScreenAsync("Home");
-        _uiService.LoadScreenAsync("Settings");
+        await _uiService.ShowScreenAsync("Home");
+        await _uiService.LoadScreenAsync("Settings");
         
-        SettingsScreen settingsScreen = await _uiService.GetScreenAsync<SettingsScreen>("Settings");
+        //SettingsScreen settingsScreen = await _uiService.GetScreenAsync<SettingsScreen>("Settings");
     }
 }
