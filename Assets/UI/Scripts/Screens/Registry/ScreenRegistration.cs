@@ -5,8 +5,8 @@ namespace AngryKoala.UI
     [Serializable]
     public struct ScreenRegistration
     {
-        public string Key { get; }
+        public string Key;
 
-        public string Address { get; }
+        public string Address;
     }
 }
