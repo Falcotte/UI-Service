@@ -142,6 +142,54 @@ namespace AngryKoala.UI
                 _activeScreens.Remove(screenKey);
             }
         }
+        
+        public async Task<TScreen> GetScreenAsync<TScreen>(string screenKey, CancellationToken cancellationToken = default)
+            where TScreen : class, IScreen
+        {
+            if (string.IsNullOrWhiteSpace(screenKey))
+            {
+                throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
+            }
+
+            if (_activeScreens.TryGetValue(screenKey, out ScreenData data))
+            {
+                if (data.Screen is TScreen typedScreen)
+                {
+                    return typedScreen;
+                }
+
+                if (data.Instance != null)
+                {
+                    TScreen found = data.Instance.GetComponentInChildren<TScreen>(true);
+                    
+                    if (found != null)
+                    {
+                        return found;
+                    }
+                }
+
+                throw new InvalidOperationException($"Loaded screen '{screenKey}' does not contain a component of type {typeof(TScreen).Name}.");
+            }
+
+            IScreen baseScreen = await LoadScreenAsync(screenKey, cancellationToken);
+
+            if (baseScreen is TScreen typed)
+            {
+                return typed;
+            }
+
+            if (_activeScreens.TryGetValue(screenKey, out ScreenData loadedData) && loadedData.Instance != null)
+            {
+                TScreen found = loadedData.Instance.GetComponentInChildren<TScreen>(true);
+                
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+
+            throw new InvalidOperationException($"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
+        }
 
         public Task<IScreen> ShowScreenAsync(string screenKey, CancellationToken cancellationToken = default)
         {
