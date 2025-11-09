@@ -17,7 +17,13 @@ namespace AngryKoala.UI
 
         private readonly Dictionary<string, ScreenData> _activeScreens = new(StringComparer.Ordinal);
 
-        public async Task<IScreen> ShowScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        public Task<IScreen> ShowScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        {
+            return ShowScreenAsync(screenKey, TransitionStyle.Animated, cancellationToken);
+        }
+
+        public async Task<IScreen> ShowScreenAsync(string screenKey, TransitionStyle style,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(screenKey))
             {
@@ -26,8 +32,7 @@ namespace AngryKoala.UI
 
             if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
-                await activeScreenData.Screen.ShowAsync(cancellationToken);
-
+                await activeScreenData.Screen.ShowAsync(style, cancellationToken);
                 return activeScreenData.Screen;
             }
 
@@ -42,14 +47,18 @@ namespace AngryKoala.UI
             }
 
             AsyncOperationHandle<GameObject> instantiateHandle =
-                Addressables.InstantiateAsync(address, _canvas.transform);
+                Addressables.InstantiateAsync(address, _canvas != null ? _canvas.transform : null);
+
             try
             {
                 await instantiateHandle.Task;
 
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    Addressables.ReleaseInstance(instantiateHandle);
+                    if (instantiateHandle.IsValid())
+                    {
+                        Addressables.ReleaseInstance(instantiateHandle);
+                    }
 
                     cancellationToken.ThrowIfCancellationRequested();
                 }
@@ -58,7 +67,10 @@ namespace AngryKoala.UI
 
                 if (instance == null)
                 {
-                    Addressables.ReleaseInstance(instantiateHandle);
+                    if (instantiateHandle.IsValid())
+                    {
+                        Addressables.ReleaseInstance(instantiateHandle);
+                    }
 
                     throw new InvalidOperationException(
                         $"Failed to instantiate screen {screenKey} from address {address}.");
@@ -68,7 +80,10 @@ namespace AngryKoala.UI
 
                 if (screen == null)
                 {
-                    Addressables.ReleaseInstance(instantiateHandle);
+                    if (instantiateHandle.IsValid())
+                    {
+                        Addressables.ReleaseInstance(instantiateHandle);
+                    }
 
                     throw new InvalidOperationException(
                         $"Instantiated prefab for {screenKey} does not contain a component implementing IScreen.");
@@ -79,7 +94,7 @@ namespace AngryKoala.UI
                 ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
                 _activeScreens[screenKey] = screenData;
 
-                await screen.ShowAsync(cancellationToken);
+                await screen.ShowAsync(style, cancellationToken);
 
                 return screen;
             }
@@ -95,7 +110,13 @@ namespace AngryKoala.UI
             }
         }
 
-        public async Task HideScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        public Task HideScreenAsync(string screenKey, CancellationToken cancellationToken = default)
+        {
+            return HideScreenAsync(screenKey, TransitionStyle.Animated, cancellationToken);
+        }
+
+        public async Task HideScreenAsync(string screenKey, TransitionStyle style,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(screenKey))
             {
@@ -109,7 +130,7 @@ namespace AngryKoala.UI
 
             try
             {
-                await screenData.Screen.HideAsync(cancellationToken);
+                await screenData.Screen.HideAsync(style, cancellationToken);
             }
             catch (Exception exception)
             {

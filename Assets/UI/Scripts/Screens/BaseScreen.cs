@@ -21,7 +21,7 @@ namespace AngryKoala.UI
             ScreenKey = screenKey;
         }
 
-        public async Task ShowAsync(CancellationToken cancellationToken)
+        public async Task ShowAsync(TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -30,7 +30,14 @@ namespace AngryKoala.UI
                 gameObject.SetActive(true);
                 IsVisible = true;
 
-                await OnShowAsync(cancellationToken);
+                if (transitionStyle == TransitionStyle.Instant)
+                {
+                    OnShowInstant();
+                }
+                else
+                {
+                    await OnShowAsync(cancellationToken);
+                }
                 
                 InvokeCallback(AfterScreenShow);
             }
@@ -41,13 +48,20 @@ namespace AngryKoala.UI
             }
         }
 
-        public async Task HideAsync(CancellationToken cancellationToken)
+        public async Task HideAsync(TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
         {
             try
             {
                 InvokeCallback(BeforeScreenHide);
                 
-                await OnHideAsync(cancellationToken);
+                if (transitionStyle == TransitionStyle.Instant)
+                {
+                    OnHideInstant();
+                }
+                else
+                {
+                    await OnHideAsync(cancellationToken);
+                }
             }
             catch (Exception exception)
             {
@@ -78,6 +92,14 @@ namespace AngryKoala.UI
         protected virtual Task OnHideAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+        
+        protected virtual void OnShowInstant()
+        {
+        }
+
+        protected virtual void OnHideInstant()
+        {
         }
         
         private void InvokeCallback(Action<IScreen> action)
