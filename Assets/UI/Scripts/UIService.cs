@@ -13,10 +13,10 @@ namespace AngryKoala.UI
     {
         [SerializeField] private Canvas _activeCanvas;
         [SerializeField] private Transform _inactiveRoot;
-        
+
         [SerializeField] private ScreenRegistry _screenRegistry;
 
-        private readonly Dictionary<string, ScreenData> _activeScreens = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ScreenData> _loadedScreens = new(StringComparer.Ordinal);
 
         private Transform ActiveRoot => _activeCanvas.transform;
 
@@ -46,7 +46,7 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
+            if (_loadedScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
                 if (activeScreenData.Instance != null && activeScreenData.Instance.activeSelf)
                 {
@@ -132,7 +132,7 @@ namespace AngryKoala.UI
                 screen.Initialize(screenKey);
 
                 ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
-                _activeScreens[screenKey] = screenData;
+                _loadedScreens[screenKey] = screenData;
 
                 if (screen is TScreen typed)
                 {
@@ -167,7 +167,7 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (!_activeScreens.TryGetValue(screenKey, out ScreenData screenData))
+            if (!_loadedScreens.TryGetValue(screenKey, out ScreenData screenData))
             {
                 return;
             }
@@ -188,7 +188,7 @@ namespace AngryKoala.UI
                     Addressables.ReleaseInstance(screenData.Handle);
                 }
 
-                _activeScreens.Remove(screenKey);
+                _loadedScreens.Remove(screenKey);
             }
         }
 
@@ -201,7 +201,7 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
+            if (_loadedScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
                 if (activeScreenData.Screen is TScreen typedScreen)
                 {
@@ -229,7 +229,7 @@ namespace AngryKoala.UI
                 return typed;
             }
 
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData screenData) && screenData.Instance != null)
+            if (_loadedScreens.TryGetValue(screenKey, out ScreenData screenData) && screenData.Instance != null)
             {
                 TScreen found = screenData.Instance.GetComponentInChildren<TScreen>(true);
 
@@ -260,7 +260,7 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_activeScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
+            if (_loadedScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
             {
                 if (activeScreenData.Instance != null)
                 {
@@ -343,7 +343,7 @@ namespace AngryKoala.UI
                 foundScreen.Initialize(screenKey);
 
                 ScreenData screenData = new ScreenData(screenKey, address, foundScreen, instance, instantiateHandle);
-                _activeScreens[screenKey] = screenData;
+                _loadedScreens[screenKey] = screenData;
 
                 instance.transform.SetParent(ActiveRoot, false);
                 await foundScreen.ShowAsync(screenTransitionStyle, cancellationToken);
@@ -375,6 +375,7 @@ namespace AngryKoala.UI
         }
 
         public async Task HideScreenAsync(string screenKey,
+            ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
             ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
@@ -383,7 +384,7 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (!_activeScreens.TryGetValue(screenKey, out ScreenData screenData))
+            if (!_loadedScreens.TryGetValue(screenKey, out ScreenData screenData))
             {
                 return;
             }
@@ -396,20 +397,53 @@ namespace AngryKoala.UI
             {
                 Debug.LogException(exception);
             }
-            finally
+            
+            switch (hideBehaviour)
             {
-                if (screenData.Handle.IsValid())
+                case ScreenHideBehaviour.Deactivate:
                 {
-                    Addressables.ReleaseInstance(screenData.Handle);
+                    if (_inactiveRoot == null)
+                    {
+                        throw new InvalidOperationException(
+                            "Inactive root is not assigned. Assign a Transform to '_inactiveRoot' on UIService.");
+                    }
+
+                    if (screenData.Instance != null)
+                    {
+                        Transform instanceTransform = screenData.Instance.transform;
+                        instanceTransform.SetParent(_inactiveRoot, false);
+
+                        if (screenData.Instance.activeSelf)
+                        {
+                            screenData.Instance.SetActive(false);
+                        }
+                    }
+                    break;
                 }
 
-                _activeScreens.Remove(screenKey);
+                case ScreenHideBehaviour.Unload:
+                {
+                    try
+                    {
+                        if (screenData.Instance != null && screenData.Handle.IsValid())
+                        {
+                            Addressables.ReleaseInstance(screenData.Handle);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+
+                    _loadedScreens.Remove(screenKey);
+                    break;
+                }
             }
         }
 
         private void OnDestroy()
         {
-            foreach (KeyValuePair<string, ScreenData> keyValuePair in _activeScreens)
+            foreach (KeyValuePair<string, ScreenData> keyValuePair in _loadedScreens)
             {
                 ScreenData screenData = keyValuePair.Value;
 
@@ -426,7 +460,7 @@ namespace AngryKoala.UI
                 }
             }
 
-            _activeScreens.Clear();
+            _loadedScreens.Clear();
         }
     }
 }

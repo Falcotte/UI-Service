@@ -24,7 +24,7 @@ public sealed class HomeScreen : BaseScreen
         if (_uiService != null)
         {
             await _uiService.ShowScreenAsync<SettingsScreen>("Settings");
-            await _uiService.HideScreenAsync("Home");
+            await _uiService.HideScreenAsync("Home", ScreenHideBehaviour.Unload);
         }
     }
 }

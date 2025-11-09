@@ -26,6 +26,7 @@ namespace AngryKoala.UI
             where TScreen : class, IScreen;
 
         Task HideScreenAsync(string screenKey,
+            ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
             ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
             CancellationToken cancellationToken = default);
     }

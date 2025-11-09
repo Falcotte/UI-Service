@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using AngryKoala.Extensions;
@@ -35,14 +36,25 @@ public sealed class SettingsScreen : BaseScreen
     
     protected override Task OnHideAsync(CancellationToken cancellationToken)
     {
-        return _canvasGroup.DOFade(0f, 1f)
+        return _canvasGroup.DOFade(0f, 2f)
             .SetEase(Ease.InCubic)
             .AwaitCompletionAsync(cancellationToken);
     }
 
     private async void OnBackClicked()
     {
-        await _uiService.HideScreenAsync("Settings");
+        Task hideTask = _uiService.HideScreenAsync("Settings");
+        Task loadTask = _uiService.LoadScreenAsync("Home");
+        
+        try
+        {
+            await Task.WhenAll(hideTask, loadTask);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+        }
+        
         await _uiService.ShowScreenAsync<HomeScreen>("Home");
     }
 }
