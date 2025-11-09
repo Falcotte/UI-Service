@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -10,6 +11,11 @@ namespace AngryKoala.UI
         
         bool IsVisible { get; }
 
+        event Action<IScreen> BeforeScreenShow;
+        event Action<IScreen> AfterScreenShow;
+        event Action<IScreen> BeforeScreenHide;
+        event Action<IScreen> AfterScreenHide;
+        
         void Initialize(string screenKey);
         
         Task ShowAsync(CancellationToken cancellationToken);

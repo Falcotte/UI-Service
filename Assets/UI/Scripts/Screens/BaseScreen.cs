@@ -10,6 +10,11 @@ namespace AngryKoala.UI
         public string ScreenKey { get; private set; }
 
         public bool IsVisible { get; private set; }
+        
+        public event Action<IScreen> BeforeScreenShow;
+        public event Action<IScreen> AfterScreenShow;
+        public event Action<IScreen> BeforeScreenHide;
+        public event Action<IScreen> AfterScreenHide;
 
         public void Initialize(string screenKey)
         {
@@ -20,10 +25,14 @@ namespace AngryKoala.UI
         {
             try
             {
+                InvokeCallback(BeforeScreenShow);
+                
                 gameObject.SetActive(true);
                 IsVisible = true;
 
                 await OnShowAsync(cancellationToken);
+                
+                InvokeCallback(AfterScreenShow);
             }
             catch (Exception exception)
             {
@@ -36,15 +45,21 @@ namespace AngryKoala.UI
         {
             try
             {
+                InvokeCallback(BeforeScreenHide);
+                
                 await OnHideAsync(cancellationToken);
-
-                IsVisible = false;
-                gameObject.SetActive(false);
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
                 throw;
+            }
+            finally
+            {
+                IsVisible = false;
+                gameObject.SetActive(false);
+                
+                InvokeCallback(AfterScreenHide);
             }
         }
 
@@ -63,6 +78,18 @@ namespace AngryKoala.UI
         protected virtual Task OnHideAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+        
+        private void InvokeCallback(Action<IScreen> action)
+        {
+            try
+            {
+                action?.Invoke(this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
         }
 
         #endregion
