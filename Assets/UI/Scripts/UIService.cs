@@ -19,6 +19,7 @@ namespace AngryKoala.UI
         [SerializeField] private ScreenRegistry _screenRegistry;
 
         private readonly Dictionary<string, ScreenData> _loadedScreens = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, IScreen> _activeSubscreensByHostKey = new(StringComparer.Ordinal);
 
         private Transform ActiveRoot => _screenRoot != null ? _screenRoot : _activeCanvas.transform;
 
@@ -399,7 +400,7 @@ namespace AngryKoala.UI
             {
                 Debug.LogException(exception);
             }
-            
+
             switch (hideBehaviour)
             {
                 case ScreenHideBehaviour.Deactivate:
@@ -420,6 +421,7 @@ namespace AngryKoala.UI
                             screenData.Instance.SetActive(false);
                         }
                     }
+
                     break;
                 }
 
@@ -440,6 +442,107 @@ namespace AngryKoala.UI
                     _loadedScreens.Remove(screenKey);
                     break;
                 }
+            }
+        }
+
+        public async Task<IScreen> ShowSubscreenAsync(string hostScreenKey, string subscreenScreenKey,
+            TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(hostScreenKey))
+            {
+                throw new ArgumentException("Host screen key cannot be null or whitespace.", nameof(hostScreenKey));
+            }
+
+            if (string.IsNullOrWhiteSpace(subscreenScreenKey))
+            {
+                throw new ArgumentException("Subscreen screen key cannot be null or whitespace.",
+                    nameof(subscreenScreenKey));
+            }
+
+            IScreen hostScreen = await GetScreenAsync<IScreen>(hostScreenKey, cancellationToken);
+
+            if (hostScreen is not Screen hostScreenImplementation)
+            {
+                throw new InvalidOperationException(
+                    $"Host screen {hostScreenKey} is expected to inherit from Screen to support subscreens.");
+            }
+
+            Transform subscreenRoot = hostScreenImplementation.SubscreenRoot;
+            if (subscreenRoot == null)
+            {
+                throw new InvalidOperationException(
+                    $"Host screen {hostScreenKey} does not define a SubscreenRoot. Assign a RectTransform to host subscreens.");
+            }
+
+            if (_activeSubscreensByHostKey.TryGetValue(hostScreenKey, out IScreen existingSubscreen) &&
+                existingSubscreen != null)
+            {
+                if (string.Equals(existingSubscreen.ScreenKey, subscreenScreenKey, StringComparison.Ordinal))
+                {
+                    GameObject existingSubscreenGameObject = existingSubscreen.GetGameObject();
+                    if (existingSubscreenGameObject != null)
+                    {
+                        Transform existingSubscreenTransform = existingSubscreenGameObject.transform;
+                        existingSubscreenTransform.SetParent(subscreenRoot, false);
+                    }
+
+                    await existingSubscreen.ShowAsync(transitionStyle, cancellationToken);
+
+                    return existingSubscreen;
+                }
+
+                try
+                {
+                    await existingSubscreen.HideAsync(TransitionStyle.Instant, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(exception);
+                }
+            }
+
+            IScreen subscreen = await GetScreenAsync<IScreen>(subscreenScreenKey, cancellationToken);
+
+            GameObject subscreenGameObject = subscreen.GetGameObject();
+            if (subscreenGameObject == null)
+            {
+                throw new InvalidOperationException(
+                    $"Subscreen {subscreenScreenKey} returned a null GameObject.");
+            }
+
+            Transform subscreenTransform = subscreenGameObject.transform;
+            subscreenTransform.SetParent(subscreenRoot, false);
+
+            await subscreen.ShowAsync(transitionStyle, cancellationToken);
+
+            _activeSubscreensByHostKey[hostScreenKey] = subscreen;
+
+            return subscreen;
+        }
+
+        public async Task HideSubscreenAsync(string hostScreenKey,
+            ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
+            TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(hostScreenKey))
+            {
+                throw new ArgumentException("Host screen key cannot be null or whitespace.", nameof(hostScreenKey));
+            }
+
+            if (!_activeSubscreensByHostKey.TryGetValue(hostScreenKey, out IScreen activeSubscreen))
+            {
+                return;
+            }
+
+            string subscreenKey = activeSubscreen.ScreenKey;
+
+            try
+            {
+                await HideScreenAsync(subscreenKey, hideBehaviour, transitionStyle, cancellationToken);
+            }
+            finally
+            {
+                _activeSubscreensByHostKey.Remove(hostScreenKey);
             }
         }
 

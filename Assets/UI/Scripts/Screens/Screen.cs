@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEngine;
 
 namespace AngryKoala.UI
@@ -6,6 +8,10 @@ namespace AngryKoala.UI
     public abstract class Screen : UIContainer, IScreen
     {
         public string ScreenKey { get; private set; }
+
+        [SerializeField] private RectTransform _subscreenRoot;
+
+        public Transform SubscreenRoot => _subscreenRoot;
 
         public event Action<IScreen> BeforeScreenShow;
         public event Action<IScreen> AfterScreenShow;
@@ -26,7 +32,7 @@ namespace AngryKoala.UI
         {
             return gameObject;
         }
-        
+
         protected override void OnBeforeShow()
         {
             InvokeCallback(BeforeScreenShow);
@@ -55,7 +61,7 @@ namespace AngryKoala.UI
             {
                 return;
             }
-            
+
             try
             {
                 callback?.Invoke(this);

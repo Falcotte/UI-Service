@@ -29,5 +29,14 @@ namespace AngryKoala.UI
             ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
             TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default);
+
+        Task<IScreen> ShowSubscreenAsync(string hostScreenKey, string subscreenScreenKey,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
+            CancellationToken cancellationToken = default);
+
+        Task HideSubscreenAsync(string hostScreenKey,
+            ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
+            CancellationToken cancellationToken = default);
     }
 }
