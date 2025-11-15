@@ -244,14 +244,14 @@ namespace AngryKoala.UI
         }
 
         public Task<IScreen> ShowScreenAsync(string screenKey,
-            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
-            return ShowScreenAsync<IScreen>(screenKey, screenTransitionStyle, cancellationToken);
+            return ShowScreenAsync<IScreen>(screenKey, transitionStyle, cancellationToken);
         }
 
         public async Task<TScreen> ShowScreenAsync<TScreen>(string screenKey,
-            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
             where TScreen : class, IScreen
         {
@@ -267,7 +267,7 @@ namespace AngryKoala.UI
                     activeScreenData.Instance.transform.SetParent(ActiveRoot, false);
                 }
 
-                await activeScreenData.Screen.ShowAsync(screenTransitionStyle, cancellationToken);
+                await activeScreenData.Screen.ShowAsync(transitionStyle, cancellationToken);
 
                 if (activeScreenData.Screen is TScreen typedScreen)
                 {
@@ -346,7 +346,7 @@ namespace AngryKoala.UI
                 _loadedScreens[screenKey] = screenData;
 
                 instance.transform.SetParent(ActiveRoot, false);
-                await foundScreen.ShowAsync(screenTransitionStyle, cancellationToken);
+                await foundScreen.ShowAsync(transitionStyle, cancellationToken);
 
                 if (foundScreen is TScreen typed)
                 {
@@ -376,7 +376,7 @@ namespace AngryKoala.UI
 
         public async Task HideScreenAsync(string screenKey,
             ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
-            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(screenKey))
@@ -391,7 +391,7 @@ namespace AngryKoala.UI
 
             try
             {
-                await screenData.Screen.HideAsync(screenTransitionStyle, cancellationToken);
+                await screenData.Screen.HideAsync(transitionStyle, cancellationToken);
             }
             catch (Exception exception)
             {

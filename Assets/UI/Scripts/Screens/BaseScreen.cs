@@ -21,7 +21,7 @@ namespace AngryKoala.UI
             ScreenKey = screenKey;
         }
 
-        public async Task ShowAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+        public async Task ShowAsync(TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
             try
@@ -31,7 +31,7 @@ namespace AngryKoala.UI
                 gameObject.SetActive(true);
                 IsVisible = true;
 
-                if (screenTransitionStyle == ScreenTransitionStyle.Instant)
+                if (transitionStyle == TransitionStyle.Instant)
                 {
                     OnShowInstant();
                 }
@@ -49,14 +49,14 @@ namespace AngryKoala.UI
             }
         }
 
-        public async Task HideAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+        public async Task HideAsync(TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
             try
             {
                 InvokeCallback(BeforeScreenHide);
 
-                if (screenTransitionStyle == ScreenTransitionStyle.Instant)
+                if (transitionStyle == TransitionStyle.Instant)
                 {
                     OnHideInstant();
                 }
