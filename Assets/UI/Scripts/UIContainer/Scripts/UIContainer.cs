@@ -5,42 +5,39 @@ using UnityEngine;
 
 namespace AngryKoala.UI
 {
-    public abstract class BaseScreen : MonoBehaviour, IScreen
+    public abstract class UIContainer : MonoBehaviour
     {
-        public string ScreenKey { get; private set; }
-
         public bool IsVisible { get; private set; }
-
-        public event Action<IScreen> BeforeScreenShow;
-        public event Action<IScreen> AfterScreenShow;
-        public event Action<IScreen> BeforeScreenHide;
-        public event Action<IScreen> AfterScreenHide;
-
-        public void Initialize(string screenKey)
-        {
-            ScreenKey = screenKey;
-        }
 
         public async Task ShowAsync(TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
         {
             try
             {
-                InvokeCallback(BeforeScreenShow);
+                cancellationToken.ThrowIfCancellationRequested();
+
+                OnBeforeShow();
 
                 gameObject.SetActive(true);
                 IsVisible = true;
 
-                if (transitionStyle == TransitionStyle.Instant)
+                switch (transitionStyle)
                 {
-                    OnShowInstant();
-                }
-                else
-                {
-                    await OnShowAsync(cancellationToken);
+                    case TransitionStyle.Instant:
+                        OnShowInstant();
+                        break;
+
+                    case TransitionStyle.Animated:
+                    default:
+                        await OnShowAsync(cancellationToken);
+                        break;
                 }
 
-                InvokeCallback(AfterScreenShow);
+                OnAfterShow();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -54,16 +51,25 @@ namespace AngryKoala.UI
         {
             try
             {
-                InvokeCallback(BeforeScreenHide);
+                cancellationToken.ThrowIfCancellationRequested();
 
-                if (transitionStyle == TransitionStyle.Instant)
+                OnBeforeHide();
+
+                switch (transitionStyle)
                 {
-                    OnHideInstant();
+                    case TransitionStyle.Instant:
+                        OnHideInstant();
+                        break;
+
+                    case TransitionStyle.Animated:
+                    default:
+                        await OnHideAsync(cancellationToken);
+                        break;
                 }
-                else
-                {
-                    await OnHideAsync(cancellationToken);
-                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception exception)
             {
@@ -75,16 +81,9 @@ namespace AngryKoala.UI
                 IsVisible = false;
                 gameObject.SetActive(false);
 
-                InvokeCallback(AfterScreenHide);
+                OnAfterHide();
             }
         }
-
-        public GameObject GetGameObject()
-        {
-            return gameObject;
-        }
-
-        #region Utility
 
         protected virtual Task OnShowAsync(CancellationToken cancellationToken)
         {
@@ -104,18 +103,20 @@ namespace AngryKoala.UI
         {
         }
 
-        private void InvokeCallback(Action<IScreen> action)
+        protected virtual void OnBeforeShow()
         {
-            try
-            {
-                action?.Invoke(this);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(exception);
-            }
         }
 
-        #endregion
+        protected virtual void OnAfterShow()
+        {
+        }
+
+        protected virtual void OnBeforeHide()
+        {
+        }
+
+        protected virtual void OnAfterHide()
+        {
+        }
     }
 }

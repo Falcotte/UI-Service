@@ -18,10 +18,10 @@ namespace AngryKoala.UI
 
         void Initialize(string screenKey);
 
-        Task ShowAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+        Task ShowAsync(TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default);
 
-        Task HideAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+        Task HideAsync(TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default);
 
         GameObject GetGameObject();

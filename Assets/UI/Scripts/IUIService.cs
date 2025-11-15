@@ -17,17 +17,17 @@ namespace AngryKoala.UI
             where TScreen : class, IScreen;
 
         Task<IScreen> ShowScreenAsync(string screenKey,
-            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default);
 
         Task<TScreen> ShowScreenAsync<TScreen>(string screenKey,
-            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default)
             where TScreen : class, IScreen;
 
         Task HideScreenAsync(string screenKey,
             ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
-            ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
             CancellationToken cancellationToken = default);
     }
 }
