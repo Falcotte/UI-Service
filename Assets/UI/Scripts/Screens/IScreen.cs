@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
@@ -7,14 +8,22 @@ namespace AngryKoala.UI
     public interface IScreen
     {
         string ScreenKey { get; }
-        
+
         bool IsVisible { get; }
 
+        event Action<IScreen> BeforeScreenShow;
+        event Action<IScreen> AfterScreenShow;
+        event Action<IScreen> BeforeScreenHide;
+        event Action<IScreen> AfterScreenHide;
+
         void Initialize(string screenKey);
-        
-        Task ShowAsync(CancellationToken cancellationToken);
-        Task HideAsync(CancellationToken cancellationToken);
-        
+
+        Task ShowAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default);
+
+        Task HideAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default);
+
         GameObject GetGameObject();
     }
 }

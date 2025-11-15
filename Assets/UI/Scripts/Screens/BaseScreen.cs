@@ -11,19 +11,36 @@ namespace AngryKoala.UI
 
         public bool IsVisible { get; private set; }
 
+        public event Action<IScreen> BeforeScreenShow;
+        public event Action<IScreen> AfterScreenShow;
+        public event Action<IScreen> BeforeScreenHide;
+        public event Action<IScreen> AfterScreenHide;
+
         public void Initialize(string screenKey)
         {
             ScreenKey = screenKey;
         }
 
-        public async Task ShowAsync(CancellationToken cancellationToken)
+        public async Task ShowAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
         {
             try
             {
+                InvokeCallback(BeforeScreenShow);
+
                 gameObject.SetActive(true);
                 IsVisible = true;
 
-                await OnShowAsync(cancellationToken);
+                if (screenTransitionStyle == ScreenTransitionStyle.Instant)
+                {
+                    OnShowInstant();
+                }
+                else
+                {
+                    await OnShowAsync(cancellationToken);
+                }
+
+                InvokeCallback(AfterScreenShow);
             }
             catch (Exception exception)
             {
@@ -32,19 +49,33 @@ namespace AngryKoala.UI
             }
         }
 
-        public async Task HideAsync(CancellationToken cancellationToken)
+        public async Task HideAsync(ScreenTransitionStyle screenTransitionStyle = ScreenTransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
         {
             try
             {
-                await OnHideAsync(cancellationToken);
+                InvokeCallback(BeforeScreenHide);
 
-                IsVisible = false;
-                gameObject.SetActive(false);
+                if (screenTransitionStyle == ScreenTransitionStyle.Instant)
+                {
+                    OnHideInstant();
+                }
+                else
+                {
+                    await OnHideAsync(cancellationToken);
+                }
             }
             catch (Exception exception)
             {
                 Debug.LogException(exception);
                 throw;
+            }
+            finally
+            {
+                IsVisible = false;
+                gameObject.SetActive(false);
+
+                InvokeCallback(AfterScreenHide);
             }
         }
 
@@ -63,6 +94,26 @@ namespace AngryKoala.UI
         protected virtual Task OnHideAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
+        }
+
+        protected virtual void OnShowInstant()
+        {
+        }
+
+        protected virtual void OnHideInstant()
+        {
+        }
+
+        private void InvokeCallback(Action<IScreen> action)
+        {
+            try
+            {
+                action?.Invoke(this);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
         }
 
         #endregion
