@@ -12,13 +12,15 @@ namespace AngryKoala.UI
     public sealed class UIService : BaseService<IUIService>, IUIService
     {
         [SerializeField] private Canvas _activeCanvas;
+
+        [SerializeField] private Transform _screenRoot;
         [SerializeField] private Transform _inactiveRoot;
 
         [SerializeField] private ScreenRegistry _screenRegistry;
 
         private readonly Dictionary<string, ScreenData> _loadedScreens = new(StringComparer.Ordinal);
 
-        private Transform ActiveRoot => _activeCanvas.transform;
+        private Transform ActiveRoot => _screenRoot != null ? _screenRoot : _activeCanvas.transform;
 
         protected override void Awake()
         {

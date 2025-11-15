@@ -7,8 +7,9 @@ using AngryKoala.UI;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
+using Screen = AngryKoala.UI.Screen;
 
-public sealed class SettingsScreen : BaseScreen
+public sealed class SettingsScreen : Screen
 {
     [SerializeField] private CanvasGroup _canvasGroup;
     
