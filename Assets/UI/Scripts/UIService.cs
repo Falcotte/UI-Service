@@ -18,8 +18,8 @@ namespace AngryKoala.UI
 
         [SerializeField] private ScreenRegistry _screenRegistry;
 
-        private readonly Dictionary<string, ScreenData> _loadedScreens = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, IScreen> _activeSubscreensByHostKey = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ScreenData> _loadedScreensByScreenKey = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, IScreen> _activeSubscreensByScreenKey = new(StringComparer.Ordinal);
 
         private Transform ActiveRoot => _screenRoot != null ? _screenRoot : _activeCanvas.transform;
 
@@ -34,9 +34,7 @@ namespace AngryKoala.UI
             }
         }
 
-        public Task<IScreen> LoadScreenAsync(
-            string screenKey,
-            CancellationToken cancellationToken = default)
+        public Task<IScreen> LoadScreenAsync(string screenKey, CancellationToken cancellationToken = default)
         {
             return LoadScreenAsync<IScreen>(screenKey, cancellationToken);
         }
@@ -49,21 +47,21 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_loadedScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
+            if (_loadedScreensByScreenKey.TryGetValue(screenKey, out ScreenData loadedScreenData))
             {
-                if (activeScreenData.Instance != null && activeScreenData.Instance.activeSelf)
+                if (loadedScreenData.Instance != null && loadedScreenData.Instance.activeSelf)
                 {
-                    activeScreenData.Instance.SetActive(false);
+                    loadedScreenData.Instance.SetActive(false);
                 }
 
-                if (activeScreenData.Screen is TScreen typedScreen)
+                if (loadedScreenData.Screen is TScreen typedScreen)
                 {
                     return typedScreen;
                 }
 
-                if (activeScreenData.Instance != null)
+                if (loadedScreenData.Instance != null)
                 {
-                    TScreen foundScreen = activeScreenData.Instance.GetComponentInChildren<TScreen>(true);
+                    TScreen foundScreen = loadedScreenData.Instance.GetComponentInChildren<TScreen>(true);
                     if (foundScreen != null)
                     {
                         return foundScreen;
@@ -135,7 +133,7 @@ namespace AngryKoala.UI
                 screen.Initialize(screenKey);
 
                 ScreenData screenData = new ScreenData(screenKey, address, screen, instance, instantiateHandle);
-                _loadedScreens[screenKey] = screenData;
+                _loadedScreensByScreenKey[screenKey] = screenData;
 
                 if (screen is TScreen typed)
                 {
@@ -170,9 +168,71 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (!_loadedScreens.TryGetValue(screenKey, out ScreenData screenData))
+            if (!_loadedScreensByScreenKey.TryGetValue(screenKey, out ScreenData screenData))
             {
+                string screenKeyToClear = null;
+
+                foreach (KeyValuePair<string, IScreen> keyValuePair in _activeSubscreensByScreenKey)
+                {
+                    IScreen trackedSubscreen = keyValuePair.Value;
+
+                    if (trackedSubscreen != null &&
+                        string.Equals(trackedSubscreen.ScreenKey, screenKey, StringComparison.Ordinal))
+                    {
+                        screenKeyToClear = keyValuePair.Key;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(screenKeyToClear))
+                {
+                    _activeSubscreensByScreenKey.Remove(screenKeyToClear);
+                }
+
                 return;
+            }
+
+            if (_activeSubscreensByScreenKey.TryGetValue(screenKey, out IScreen activeSubscreen) &&
+                activeSubscreen != null)
+            {
+                _activeSubscreensByScreenKey.Remove(screenKey);
+
+                string subscreenScreenKey = activeSubscreen.ScreenKey;
+
+                if (!string.IsNullOrWhiteSpace(subscreenScreenKey) &&
+                    !string.Equals(subscreenScreenKey, screenKey, StringComparison.Ordinal) &&
+                    _loadedScreensByScreenKey.ContainsKey(subscreenScreenKey))
+                {
+                    try
+                    {
+                        await UnloadScreenAsync(subscreenScreenKey, cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                }
+            }
+            else
+            {
+                string screenKeyToClear = null;
+
+                foreach (KeyValuePair<string, IScreen> keyValuePair in _activeSubscreensByScreenKey)
+                {
+                    IScreen trackedSubscreen = keyValuePair.Value;
+
+                    if (trackedSubscreen != null &&
+                        string.Equals(trackedSubscreen.ScreenKey, screenKey, StringComparison.Ordinal))
+                    {
+                        screenKeyToClear = keyValuePair.Key;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(screenKeyToClear))
+                {
+                    _activeSubscreensByScreenKey.Remove(screenKeyToClear);
+                }
             }
 
             try
@@ -191,29 +251,28 @@ namespace AngryKoala.UI
                     Addressables.ReleaseInstance(screenData.Handle);
                 }
 
-                _loadedScreens.Remove(screenKey);
+                _loadedScreensByScreenKey.Remove(screenKey);
             }
         }
 
         public async Task<TScreen> GetScreenAsync<TScreen>(string screenKey,
-            CancellationToken cancellationToken = default)
-            where TScreen : class, IScreen
+            CancellationToken cancellationToken = default) where TScreen : class, IScreen
         {
             if (string.IsNullOrWhiteSpace(screenKey))
             {
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_loadedScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
+            if (_loadedScreensByScreenKey.TryGetValue(screenKey, out ScreenData loadedScreenData))
             {
-                if (activeScreenData.Screen is TScreen typedScreen)
+                if (loadedScreenData.Screen is TScreen typedScreen)
                 {
                     return typedScreen;
                 }
 
-                if (activeScreenData.Instance != null)
+                if (loadedScreenData.Instance != null)
                 {
-                    TScreen foundScreen = activeScreenData.Instance.GetComponentInChildren<TScreen>(true);
+                    TScreen foundScreen = loadedScreenData.Instance.GetComponentInChildren<TScreen>(true);
 
                     if (foundScreen != null)
                     {
@@ -225,16 +284,17 @@ namespace AngryKoala.UI
                     $"Loaded screen {screenKey} does not contain a component of type {typeof(TScreen).Name}.");
             }
 
-            IScreen baseScreen = await LoadScreenAsync(screenKey, cancellationToken);
+            IScreen screen = await LoadScreenAsync(screenKey, cancellationToken);
 
-            if (baseScreen is TScreen typed)
+            if (screen is TScreen typed)
             {
                 return typed;
             }
 
-            if (_loadedScreens.TryGetValue(screenKey, out ScreenData screenData) && screenData.Instance != null)
+            if (_loadedScreensByScreenKey.TryGetValue(screenKey, out loadedScreenData) &&
+                loadedScreenData.Instance != null)
             {
-                TScreen found = screenData.Instance.GetComponentInChildren<TScreen>(true);
+                TScreen found = loadedScreenData.Instance.GetComponentInChildren<TScreen>(true);
 
                 if (found != null)
                 {
@@ -247,15 +307,13 @@ namespace AngryKoala.UI
         }
 
         public Task<IScreen> ShowScreenAsync(string screenKey,
-            TransitionStyle transitionStyle = TransitionStyle.Animated,
-            CancellationToken cancellationToken = default)
+            TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
         {
             return ShowScreenAsync<IScreen>(screenKey, transitionStyle, cancellationToken);
         }
 
         public async Task<TScreen> ShowScreenAsync<TScreen>(string screenKey,
-            TransitionStyle transitionStyle = TransitionStyle.Animated,
-            CancellationToken cancellationToken = default)
+            TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
             where TScreen : class, IScreen
         {
             if (string.IsNullOrWhiteSpace(screenKey))
@@ -263,23 +321,23 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (_loadedScreens.TryGetValue(screenKey, out ScreenData activeScreenData))
+            if (_loadedScreensByScreenKey.TryGetValue(screenKey, out ScreenData loadedScreenData))
             {
-                if (activeScreenData.Instance != null)
+                if (loadedScreenData.Instance != null)
                 {
-                    activeScreenData.Instance.transform.SetParent(ActiveRoot, false);
+                    loadedScreenData.Instance.transform.SetParent(ActiveRoot, false);
                 }
 
-                await activeScreenData.Screen.ShowAsync(transitionStyle, cancellationToken);
+                await loadedScreenData.Screen.ShowAsync(transitionStyle, cancellationToken);
 
-                if (activeScreenData.Screen is TScreen typedScreen)
+                if (loadedScreenData.Screen is TScreen typedScreen)
                 {
                     return typedScreen;
                 }
 
-                if (activeScreenData.Instance != null)
+                if (loadedScreenData.Instance != null)
                 {
-                    TScreen foundScreen = activeScreenData.Instance.GetComponentInChildren<TScreen>(true);
+                    TScreen foundScreen = loadedScreenData.Instance.GetComponentInChildren<TScreen>(true);
                     if (foundScreen != null)
                     {
                         return foundScreen;
@@ -300,8 +358,7 @@ namespace AngryKoala.UI
                 throw new KeyNotFoundException($"No Addressables address found for screen key {screenKey}.");
             }
 
-            AsyncOperationHandle<GameObject> instantiateHandle =
-                Addressables.InstantiateAsync(address, _inactiveRoot);
+            AsyncOperationHandle<GameObject> instantiateHandle = Addressables.InstantiateAsync(address, _inactiveRoot);
 
             try
             {
@@ -346,7 +403,7 @@ namespace AngryKoala.UI
                 foundScreen.Initialize(screenKey);
 
                 ScreenData screenData = new ScreenData(screenKey, address, foundScreen, instance, instantiateHandle);
-                _loadedScreens[screenKey] = screenData;
+                _loadedScreensByScreenKey[screenKey] = screenData;
 
                 instance.transform.SetParent(ActiveRoot, false);
                 await foundScreen.ShowAsync(transitionStyle, cancellationToken);
@@ -387,14 +444,76 @@ namespace AngryKoala.UI
                 throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (!_loadedScreens.TryGetValue(screenKey, out ScreenData screenData))
+            if (!_loadedScreensByScreenKey.TryGetValue(screenKey, out ScreenData loadedScreenData))
             {
+                string screenKeyToClear = null;
+
+                foreach (KeyValuePair<string, IScreen> keyValuePair in _activeSubscreensByScreenKey)
+                {
+                    IScreen trackedSubscreen = keyValuePair.Value;
+
+                    if (trackedSubscreen != null &&
+                        string.Equals(trackedSubscreen.ScreenKey, screenKey, StringComparison.Ordinal))
+                    {
+                        screenKeyToClear = keyValuePair.Key;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(screenKeyToClear))
+                {
+                    _activeSubscreensByScreenKey.Remove(screenKeyToClear);
+                }
+
                 return;
+            }
+
+            if (_activeSubscreensByScreenKey.TryGetValue(screenKey, out IScreen activeSubscreen) &&
+                activeSubscreen != null)
+            {
+                _activeSubscreensByScreenKey.Remove(screenKey);
+
+                string subscreenScreenKey = activeSubscreen.ScreenKey;
+
+                if (!string.IsNullOrWhiteSpace(subscreenScreenKey) &&
+                    !string.Equals(subscreenScreenKey, screenKey, StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        await HideScreenAsync(subscreenScreenKey, hideBehaviour, TransitionStyle.Instant,
+                            cancellationToken);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(exception);
+                    }
+                }
+            }
+            else
+            {
+                string screenKeyToClear = null;
+
+                foreach (KeyValuePair<string, IScreen> keyValuePair in _activeSubscreensByScreenKey)
+                {
+                    IScreen trackedSubscreen = keyValuePair.Value;
+
+                    if (trackedSubscreen != null &&
+                        string.Equals(trackedSubscreen.ScreenKey, screenKey, StringComparison.Ordinal))
+                    {
+                        screenKeyToClear = keyValuePair.Key;
+                        break;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(screenKeyToClear))
+                {
+                    _activeSubscreensByScreenKey.Remove(screenKeyToClear);
+                }
             }
 
             try
             {
-                await screenData.Screen.HideAsync(transitionStyle, cancellationToken);
+                await loadedScreenData.Screen.HideAsync(transitionStyle, cancellationToken);
             }
             catch (Exception exception)
             {
@@ -411,14 +530,14 @@ namespace AngryKoala.UI
                             "Inactive root is not assigned. Assign a Transform to '_inactiveRoot' on UIService.");
                     }
 
-                    if (screenData.Instance != null)
+                    if (loadedScreenData.Instance != null)
                     {
-                        Transform instanceTransform = screenData.Instance.transform;
+                        Transform instanceTransform = loadedScreenData.Instance.transform;
                         instanceTransform.SetParent(_inactiveRoot, false);
 
-                        if (screenData.Instance.activeSelf)
+                        if (loadedScreenData.Instance.activeSelf)
                         {
-                            screenData.Instance.SetActive(false);
+                            loadedScreenData.Instance.SetActive(false);
                         }
                     }
 
@@ -429,9 +548,9 @@ namespace AngryKoala.UI
                 {
                     try
                     {
-                        if (screenData.Instance != null && screenData.Handle.IsValid())
+                        if (loadedScreenData.Instance != null && loadedScreenData.Handle.IsValid())
                         {
-                            Addressables.ReleaseInstance(screenData.Handle);
+                            Addressables.ReleaseInstance(loadedScreenData.Handle);
                         }
                     }
                     catch (Exception exception)
@@ -439,61 +558,79 @@ namespace AngryKoala.UI
                         Debug.LogException(exception);
                     }
 
-                    _loadedScreens.Remove(screenKey);
+                    _loadedScreensByScreenKey.Remove(screenKey);
                     break;
                 }
             }
         }
 
-        public async Task<IScreen> ShowSubscreenAsync(string hostScreenKey, string subscreenScreenKey,
-            TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
+        public async Task<IScreen> ShowSubscreenAsync(string screenKey, string subscreenScreenKey,
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(hostScreenKey))
+            if (string.IsNullOrWhiteSpace(screenKey))
             {
-                throw new ArgumentException("Host screen key cannot be null or whitespace.", nameof(hostScreenKey));
+                throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
             if (string.IsNullOrWhiteSpace(subscreenScreenKey))
             {
-                throw new ArgumentException("Subscreen screen key cannot be null or whitespace.",
-                    nameof(subscreenScreenKey));
+                throw new ArgumentException("Subscreen key cannot be null or whitespace.", nameof(subscreenScreenKey));
             }
 
-            IScreen hostScreen = await GetScreenAsync<IScreen>(hostScreenKey, cancellationToken);
-
-            if (hostScreen is not Screen hostScreenImplementation)
+            if (!_loadedScreensByScreenKey.TryGetValue(screenKey, out ScreenData loadedScreenData))
             {
                 throw new InvalidOperationException(
-                    $"Host screen {hostScreenKey} is expected to inherit from Screen to support subscreens.");
+                    $"Cannot show subscreen {subscreenScreenKey} because screen {screenKey} is not loaded. " +
+                    $"Call ShowScreenAsync or LoadScreenAsync for screen {screenKey} first.");
             }
 
-            Transform subscreenRoot = hostScreenImplementation.SubscreenRoot;
+            IScreen screen = loadedScreenData.Screen;
+
+            if (!screen.IsVisible)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot show subscreen {subscreenScreenKey} because screen {screenKey} is not visible. " +
+                    $"Call ShowScreenAsync for screen {screenKey} first.");
+            }
+
+            if (screen is not Screen typedScreen)
+            {
+                throw new InvalidOperationException(
+                    $"Screen {screenKey} must inherit from Screen to support subscreens.");
+            }
+
+            Transform subscreenRoot = typedScreen.SubscreenRoot;
             if (subscreenRoot == null)
             {
                 throw new InvalidOperationException(
-                    $"Host screen {hostScreenKey} does not define a SubscreenRoot. Assign a RectTransform to host subscreens.");
+                    $"Screen {screenKey} does not define a SubscreenRoot. " +
+                    "Assign a RectTransform to support subscreens.");
             }
 
-            if (_activeSubscreensByHostKey.TryGetValue(hostScreenKey, out IScreen existingSubscreen) &&
-                existingSubscreen != null)
+            GameObject subscreenGameObject;
+            Transform subscreenTransform;
+
+            if (_activeSubscreensByScreenKey.TryGetValue(screenKey, out IScreen activeSubscreen) &&
+                activeSubscreen != null)
             {
-                if (string.Equals(existingSubscreen.ScreenKey, subscreenScreenKey, StringComparison.Ordinal))
+                if (string.Equals(activeSubscreen.ScreenKey, subscreenScreenKey, StringComparison.Ordinal))
                 {
-                    GameObject existingSubscreenGameObject = existingSubscreen.GetGameObject();
-                    if (existingSubscreenGameObject != null)
+                    subscreenGameObject = activeSubscreen.GetGameObject();
+                    if (subscreenGameObject != null)
                     {
-                        Transform existingSubscreenTransform = existingSubscreenGameObject.transform;
-                        existingSubscreenTransform.SetParent(subscreenRoot, false);
+                        subscreenTransform = subscreenGameObject.transform;
+                        subscreenTransform.SetParent(subscreenRoot, false);
                     }
 
-                    await existingSubscreen.ShowAsync(transitionStyle, cancellationToken);
-
-                    return existingSubscreen;
+                    await activeSubscreen.ShowAsync(transitionStyle, cancellationToken);
+                    return activeSubscreen;
                 }
 
                 try
                 {
-                    await existingSubscreen.HideAsync(TransitionStyle.Instant, cancellationToken);
+                    await HideScreenAsync(activeSubscreen.ScreenKey, ScreenHideBehaviour.Deactivate,
+                        TransitionStyle.Instant, cancellationToken);
                 }
                 catch (Exception exception)
                 {
@@ -501,54 +638,63 @@ namespace AngryKoala.UI
                 }
             }
 
-            IScreen subscreen = await GetScreenAsync<IScreen>(subscreenScreenKey, cancellationToken);
+            IScreen subscreen = await LoadScreenAsync(subscreenScreenKey, cancellationToken);
 
-            GameObject subscreenGameObject = subscreen.GetGameObject();
+            subscreenGameObject = subscreen.GetGameObject();
             if (subscreenGameObject == null)
             {
                 throw new InvalidOperationException(
-                    $"Subscreen {subscreenScreenKey} returned a null GameObject.");
+                    $"Subscreen '{subscreenScreenKey}' returned a null GameObject.");
             }
 
-            Transform subscreenTransform = subscreenGameObject.transform;
+            subscreenTransform = subscreenGameObject.transform;
             subscreenTransform.SetParent(subscreenRoot, false);
 
             await subscreen.ShowAsync(transitionStyle, cancellationToken);
 
-            _activeSubscreensByHostKey[hostScreenKey] = subscreen;
+            _activeSubscreensByScreenKey[screenKey] = subscreen;
 
             return subscreen;
         }
 
-        public async Task HideSubscreenAsync(string hostScreenKey,
+        public async Task HideSubscreenAsync(string screenKey,
             ScreenHideBehaviour hideBehaviour = ScreenHideBehaviour.Deactivate,
-            TransitionStyle transitionStyle = TransitionStyle.Animated, CancellationToken cancellationToken = default)
+            TransitionStyle transitionStyle = TransitionStyle.Animated,
+            CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(hostScreenKey))
+            if (string.IsNullOrWhiteSpace(screenKey))
             {
-                throw new ArgumentException("Host screen key cannot be null or whitespace.", nameof(hostScreenKey));
+                throw new ArgumentException("Screen key cannot be null or whitespace.", nameof(screenKey));
             }
 
-            if (!_activeSubscreensByHostKey.TryGetValue(hostScreenKey, out IScreen activeSubscreen))
+            if (!_activeSubscreensByScreenKey.TryGetValue(screenKey, out IScreen activeSubscreen) ||
+                activeSubscreen == null)
             {
                 return;
             }
 
-            string subscreenKey = activeSubscreen.ScreenKey;
+            _activeSubscreensByScreenKey.Remove(screenKey);
+
+            string subscreenScreenKey = activeSubscreen.ScreenKey;
+            
+            if (string.IsNullOrWhiteSpace(subscreenScreenKey))
+            {
+                return;
+            }
 
             try
             {
-                await HideScreenAsync(subscreenKey, hideBehaviour, transitionStyle, cancellationToken);
+                await HideScreenAsync( subscreenScreenKey, hideBehaviour, transitionStyle, cancellationToken);
             }
-            finally
+            catch (Exception exception)
             {
-                _activeSubscreensByHostKey.Remove(hostScreenKey);
+                Debug.LogException(exception);
             }
         }
 
         private void OnDestroy()
         {
-            foreach (KeyValuePair<string, ScreenData> keyValuePair in _loadedScreens)
+            foreach (KeyValuePair<string, ScreenData> keyValuePair in _loadedScreensByScreenKey)
             {
                 ScreenData screenData = keyValuePair.Value;
 
@@ -565,7 +711,8 @@ namespace AngryKoala.UI
                 }
             }
 
-            _loadedScreens.Clear();
+            _loadedScreensByScreenKey.Clear();
+            _activeSubscreensByScreenKey.Clear();
         }
     }
 }
