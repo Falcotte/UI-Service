@@ -2,8 +2,9 @@ using AngryKoala.Services;
 using AngryKoala.UI;
 using UnityEngine;
 using UnityEngine.UI;
+using Screen = AngryKoala.UI.Screen;
 
-public sealed class HomeScreen : BaseScreen
+public sealed class HomeScreen : Screen
 {
     [SerializeField] private Button _goToSettingsButton;
 
