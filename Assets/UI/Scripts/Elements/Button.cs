@@ -23,6 +23,8 @@ namespace AngryKoala.UI
         [SerializeField] private Ease _pressEase = Ease.OutQuad;
         [SerializeField] private Ease _releaseEase = Ease.OutQuad;
 
+        [SerializeField] private bool _disableAfterClick;
+        
         private bool _isClickable = true;
         private bool _isPointerDown = false;
         private bool _isPointerInside = false;
@@ -86,6 +88,11 @@ namespace AngryKoala.UI
                 OnPointerUpEvent?.Invoke();
                 OnClickEvent?.Invoke();
             }
+
+            if (_disableAfterClick)
+            {
+                DisableButton();
+            }
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -115,11 +122,21 @@ namespace AngryKoala.UI
             _initialLocalScale = _buttonVisual.localScale;
         }
 
-        private void ResetTransformValues()
+        public void ResetTransformValues()
         {
             _buttonVisual.localPosition = _initialLocalPosition;
             _buttonVisual.localRotation = _initialLocalRotation;
             _buttonVisual.localScale = _initialLocalScale;
+        }
+
+        public void EnableButton()
+        {
+            _isClickable = true;
+        }
+        
+        public void DisableButton()
+        {
+            _isClickable = false;
         }
 
         private void AnimateToPressedPose()
