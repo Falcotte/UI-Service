@@ -23,8 +23,11 @@ namespace AngryKoala.UI
         [SerializeField] private Ease _pressEase = Ease.OutQuad;
         [SerializeField] private Ease _releaseEase = Ease.OutQuad;
 
+        [SerializeField] private bool _allowMultipleClicks = true;
+        [SerializeField] private float _disableDuration = 0.2f;
+
         [SerializeField] private bool _disableAfterClick;
-        
+
         private bool _isClickable = true;
         private bool _isPointerDown = false;
         private bool _isPointerInside = false;
@@ -36,6 +39,8 @@ namespace AngryKoala.UI
         private Tween _positionTween;
         private Tween _rotationTween;
         private Tween _scaleTween;
+
+        private Tween _clickCooldownTween;
 
         public UnityEvent OnPointerDownEvent;
         public UnityEvent OnPointerUpEvent;
@@ -49,6 +54,12 @@ namespace AngryKoala.UI
         private void OnEnable()
         {
             ResetTransformValues();
+            CancelClickCooldown();
+        }
+
+        private void OnDisable()
+        {
+            CancelClickCooldown();
         }
 
         public void OnPointerDown(PointerEventData eventData)
@@ -61,7 +72,10 @@ namespace AngryKoala.UI
             _isPointerDown = true;
             _isPointerInside = true;
 
-            AnimateToPressedPose();
+            if (_animateOnClick)
+            {
+                AnimateToPressedPose();
+            }
 
             OnPointerDownEvent?.Invoke();
         }
@@ -77,21 +91,29 @@ namespace AngryKoala.UI
 
             _isPointerDown = false;
 
-            if (shouldClick)
+            if (_animateOnClick)
             {
                 AnimateToReleasedPose();
             }
             else
             {
-                AnimateToReleasedPose();
-
-                OnPointerUpEvent?.Invoke();
-                OnClickEvent?.Invoke();
+                ResetTransformValues();
             }
 
-            if (_disableAfterClick)
+            OnPointerUpEvent?.Invoke();
+
+            if (shouldClick)
             {
-                DisableButton();
+                OnClickEvent?.Invoke();
+
+                if (_disableAfterClick)
+                {
+                    DisableButton();
+                }
+                else if (!_allowMultipleClicks)
+                {
+                    StartClickCooldown();
+                }
             }
         }
 
@@ -99,7 +121,7 @@ namespace AngryKoala.UI
         {
             _isPointerInside = true;
 
-            if (_isPointerDown && _isClickable)
+            if (_isPointerDown && _isClickable && _animateOnClick)
             {
                 AnimateToPressedPose();
             }
@@ -109,7 +131,7 @@ namespace AngryKoala.UI
         {
             _isPointerInside = false;
 
-            if (_isPointerDown)
+            if (_isPointerDown && _animateOnClick)
             {
                 AnimateToReleasedPose();
             }
@@ -133,10 +155,41 @@ namespace AngryKoala.UI
         {
             _isClickable = true;
         }
-        
+
         public void DisableButton()
         {
             _isClickable = false;
+        }
+
+        private void StartClickCooldown()
+        {
+            if (_disableDuration <= 0f)
+            {
+                return;
+            }
+
+            CancelClickCooldown();
+            _isClickable = false;
+
+            _clickCooldownTween = DOVirtual.DelayedCall(_disableDuration, () =>
+                {
+                    if (!_disableAfterClick)
+                    {
+                        _isClickable = true;
+                    }
+                })
+                .SetId("UI")
+                .SetLink(gameObject);
+        }
+
+        private void CancelClickCooldown()
+        {
+            if (_clickCooldownTween != null && _clickCooldownTween.IsActive())
+            {
+                _clickCooldownTween.Kill();
+            }
+
+            _clickCooldownTween = null;
         }
 
         private void AnimateToPressedPose()
@@ -163,7 +216,7 @@ namespace AngryKoala.UI
                 .SetLink(gameObject);
         }
 
-        private void AnimateToReleasedPose(Action onComplete = null)
+        private void AnimateToReleasedPose()
         {
             KillTweens();
 
@@ -176,12 +229,11 @@ namespace AngryKoala.UI
                 .SetEase(_releaseEase)
                 .SetId("UI")
                 .SetLink(gameObject);
-            
-            _scaleTween = _buttonVisual.DOScale(Vector3.one, _releaseDuration)
+
+            _scaleTween = _buttonVisual.DOScale(_initialLocalScale, _releaseDuration)
                 .SetEase(_releaseEase)
                 .SetId("UI")
-                .SetLink(gameObject)
-                .OnComplete(() => onComplete?.Invoke());
+                .SetLink(gameObject);
         }
 
         private void KillTweens()
