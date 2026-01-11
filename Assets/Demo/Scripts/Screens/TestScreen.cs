@@ -1,3 +1,4 @@
+using System;
 using AngryKoala.Services;
 using AngryKoala.UI;
 using UnityEngine;
@@ -21,8 +22,15 @@ public class TestScreen : Screen
         _closeButton.OnClickEvent.RemoveListener(CloseScreen);
     }
 
-    private void CloseScreen()
+    private async void CloseScreen()
     {
-        _uiService.HideScreenAsync(ScreenKey);
+        try
+        {
+            await _uiService.HideScreenAsync(ScreenKey);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+        }
     }
 }

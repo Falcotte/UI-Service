@@ -1,3 +1,4 @@
+using System;
 using AngryKoala.Services;
 using AngryKoala.UI;
 using UnityEngine;
@@ -9,11 +10,11 @@ public class MainScreen : Screen
     [SerializeField] private Button _openTestScreenWithSubscreenButton;
 
     private IUIService _uiService;
-    
+
     private void OnEnable()
     {
         _uiService = ServiceLocator.Get<IUIService>();
-        
+
         _openTestScreenButton.OnClickEvent.AddListener(OpenTestScreen);
         _openTestScreenWithSubscreenButton.OnClickEvent.AddListener(OpenTestScreenWithSubscreen);
     }
@@ -24,14 +25,28 @@ public class MainScreen : Screen
         _openTestScreenWithSubscreenButton.OnClickEvent.RemoveListener(OpenTestScreenWithSubscreen);
     }
 
-    private void OpenTestScreen()
+    private async void OpenTestScreen()
     {
-        _uiService.ShowScreenAsync("TestScreen");
+        try
+        {
+            await _uiService.ShowScreenAsync("TestScreen");
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+        }
     }
 
     private async void OpenTestScreenWithSubscreen()
     {
-        await _uiService.ShowScreenAsync("TestScreenWithSubscreen");
-        await _uiService.ShowSubscreenAsync("TestScreenWithSubscreen", "TestSubscreen");
+        try
+        {
+            await _uiService.ShowScreenAsync("TestScreenWithSubscreen");
+            await _uiService.ShowSubscreenAsync("TestScreenWithSubscreen", "TestSubscreen");
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+        }
     }
 }

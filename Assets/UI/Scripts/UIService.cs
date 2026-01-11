@@ -21,7 +21,7 @@ namespace AngryKoala.UI
         private readonly Dictionary<string, ScreenData> _loadedScreensByScreenKey = new(StringComparer.Ordinal);
         private readonly Dictionary<string, IScreen> _activeSubscreensByScreenKey = new(StringComparer.Ordinal);
 
-        private Transform ActiveRoot => _screenRoot != null ? _screenRoot : _activeCanvas.transform;
+        private Transform _activeRoot => _screenRoot != null ? _screenRoot : _activeCanvas.transform;
 
         protected override void Awake()
         {
@@ -325,7 +325,7 @@ namespace AngryKoala.UI
             {
                 if (loadedScreenData.Instance != null)
                 {
-                    loadedScreenData.Instance.transform.SetParent(ActiveRoot, false);
+                    loadedScreenData.Instance.transform.SetParent(_activeRoot, false);
                 }
 
                 await loadedScreenData.Screen.ShowAsync(transitionStyle, cancellationToken);
@@ -405,7 +405,7 @@ namespace AngryKoala.UI
                 ScreenData screenData = new ScreenData(screenKey, address, foundScreen, instance, instantiateHandle);
                 _loadedScreensByScreenKey[screenKey] = screenData;
 
-                instance.transform.SetParent(ActiveRoot, false);
+                instance.transform.SetParent(_activeRoot, false);
                 await foundScreen.ShowAsync(transitionStyle, cancellationToken);
 
                 if (foundScreen is TScreen typed)

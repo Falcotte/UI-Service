@@ -7,13 +7,13 @@ using Screen = AngryKoala.UI.Screen;
 public class Subscreen : Screen
 {
     [SerializeField] private Button _closeButton;
-   
+
     private IUIService _uiService;
 
     private void OnEnable()
     {
         _uiService = ServiceLocator.Get<IUIService>();
-        
+
         _closeButton.OnClickEvent.AddListener(CloseScreen);
     }
 
@@ -22,8 +22,15 @@ public class Subscreen : Screen
         _closeButton.OnClickEvent.RemoveListener(CloseScreen);
     }
 
-    private void CloseScreen()
+    private async void CloseScreen()
     {
-        _uiService.HideSubscreenAsync(ScreenKey);
+        try
+        {
+            await _uiService.HideSubscreenAsync(ScreenKey);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+        }
     }
 }
