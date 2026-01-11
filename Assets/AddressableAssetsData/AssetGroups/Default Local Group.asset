@@ -15,13 +15,23 @@ MonoBehaviour:
   m_GroupName: Default Local Group
   m_GUID: 702c0a65bef6dc14abd6e21036aa3076
   m_SerializeEntries:
-  - m_GUID: 321dd540e1e366a4f923e30c78e0bf61
-    m_Address: ui_prefabs/settings_screen
+  - m_GUID: 00520d253a167444ba00263d8220032c
+    m_Address: ui_prefabs/mainscreen
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0
-  - m_GUID: f0703514b11b8e4418590cf643f3ca4a
-    m_Address: ui_prefabs/home_screen
+  - m_GUID: 58245cb02e77d8540881d0b804c7bae6
+    m_Address: ui_prefabs/testscreen
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: c9e3aba18ea456740b9d1e29f2dd6968
+    m_Address: ui_prefabs/testscreenwithsubscreen
+    m_ReadOnly: 0
+    m_SerializedLabels: []
+    FlaggedDuringContentUpdateRestriction: 0
+  - m_GUID: f1f3db6b429a677439c3c38aaf442d11
+    m_Address: ui_prefabs/testsubscreen
     m_ReadOnly: 0
     m_SerializedLabels: []
     FlaggedDuringContentUpdateRestriction: 0

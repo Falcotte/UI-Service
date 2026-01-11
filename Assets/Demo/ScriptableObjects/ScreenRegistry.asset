@@ -13,7 +13,11 @@ MonoBehaviour:
   m_Name: ScreenRegistry
   m_EditorClassIdentifier: 
   _registrations:
-  - Key: Home
-    Address: ui_prefabs/home_screen
-  - Key: Settings
-    Address: ui_prefabs/settings_screen
+  - Key: Main
+    Address: ui_prefabs/mainscreen
+  - Key: TestSubscreen
+    Address: ui_prefabs/testsubscreen
+  - Key: TestScreen
+    Address: ui_prefabs/testscreen
+  - Key: TestScreenWithSubscreen
+    Address: ui_prefabs/testscreenwithsubscreen

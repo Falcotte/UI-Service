@@ -611,7 +611,7 @@ namespace AngryKoala.UI
             GameObject subscreenGameObject;
             Transform subscreenTransform;
 
-            if (_activeSubscreensByScreenKey.TryGetValue(screenKey, out IScreen activeSubscreen) &&
+            if (_activeSubscreensByScreenKey.TryGetValue(subscreenScreenKey, out IScreen activeSubscreen) &&
                 activeSubscreen != null)
             {
                 if (string.Equals(activeSubscreen.ScreenKey, subscreenScreenKey, StringComparison.Ordinal))
@@ -652,7 +652,7 @@ namespace AngryKoala.UI
 
             await subscreen.ShowAsync(transitionStyle, cancellationToken);
 
-            _activeSubscreensByScreenKey[screenKey] = subscreen;
+            _activeSubscreensByScreenKey[subscreenScreenKey] = subscreen;
 
             return subscreen;
         }
